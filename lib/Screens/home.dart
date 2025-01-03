@@ -1,6 +1,8 @@
 import 'dart:math'; // Import pour générer des couleurs aléatoires
 import 'package:app_hobby/Screens/screen1.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -38,7 +40,31 @@ class _HomeState extends State<Home> {
       random.nextInt(156) + 100, // Rouge (100-255)
       random.nextInt(156) + 100, // Vert (100-255)
       random.nextInt(156) + 100, // Bleu (100-255)
-    ).withOpacity(0.5);
+    ).withOpacity(0.8); // Couleur vive
+  }
+
+  Future<void> _saveHobbiesToFirebase() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'hobbies': selectedHobbies,
+        }, SetOptions(merge: true));
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Hobbies saved successfully!")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No user logged in!")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving hobbies: $e")),
+      );
+    }
   }
 
   @override
@@ -114,7 +140,7 @@ class _HomeState extends State<Home> {
                           const SizedBox(height: 8),
                           Text(
                             hobby['name'],
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w500,
                               color: Colors.black,
                             ),
@@ -129,9 +155,10 @@ class _HomeState extends State<Home> {
             const SizedBox(height: 20),
             Center(
               child: GestureDetector(
-                onTap: () {
+                onTap: () async {
+                  await _saveHobbiesToFirebase();
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (context) => Screen1()));
+                      MaterialPageRoute(builder: (context) => const Screen1()));
                 },
                 child: Container(
                   height: 70,
@@ -143,7 +170,7 @@ class _HomeState extends State<Home> {
                     padding: const EdgeInsets.only(left: 20, right: 5),
                     child: Row(
                       children: [
-                        Text(
+                        const Text(
                           "Start",
                           style: TextStyle(
                               color: Colors.white,
@@ -157,7 +184,7 @@ class _HomeState extends State<Home> {
                           decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
                               color: Colors.white),
-                          child: Icon(Icons.arrow_forward_rounded),
+                          child: const Icon(Icons.arrow_forward_rounded),
                         )
                       ],
                     ),

@@ -38,8 +38,11 @@ class _WelcomeState extends State<Welcome> {
         const SnackBar(content: Text("Login successful!")),
       );
 
+      // Enregistrer l'utilisateur connecté
+      await prefs.setString('loggedInUser', username);
+
       // Redirection vers la page principale
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const Home()),
       );
@@ -136,7 +139,7 @@ class _WelcomeState extends State<Welcome> {
         await FirebaseAuth.instance.signInWithCredential(credential);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Signed in as ${googleUser.displayName}")),
+          SnackBar(content: Text("Bienvenue ${googleUser.displayName}")),
         );
 
         // Redirection vers la page principale
