@@ -1,7 +1,8 @@
+import 'package:app_hobby/Tabs/tab_foryou.dart';
+import 'package:app_hobby/Tabs/you.dart';
 import 'package:buttons_tabbar/buttons_tabbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class Screen1 extends StatefulWidget {
   const Screen1({super.key});
@@ -12,34 +13,25 @@ class Screen1 extends StatefulWidget {
 
 class _Screen1State extends State<Screen1> {
   String userName = 'User'; // Nom par défaut
-  String? photoUrl; // Photo par défaut (null pour les utilisateurs locaux)
-  String accountType = 'Local'; // Par défaut, compte local
+  String? photoUrl; // Photo par défaut (null si aucune photo n'est disponible)
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadGoogleUserData();
   }
 
-  Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? localUsername = prefs.getString('username');
+  void _loadGoogleUserData() {
     final User? googleUser = FirebaseAuth.instance.currentUser;
 
-    if (localUsername != null) {
-      // Priorité aux données locales si un utilisateur local est connecté
-      setState(() {
-        userName = localUsername;
-        photoUrl = null; // Les comptes locaux n'ont pas de photo
-      });
-    } else if (googleUser != null) {
-      // Sinon, utiliser les données Google si un utilisateur Google est connecté
+    if (googleUser != null) {
+      // Si un utilisateur Google est connecté, récupérer ses informations
       setState(() {
         userName = googleUser.displayName ?? 'Google User';
         photoUrl = googleUser.photoURL;
       });
     } else {
-      // Par défaut si aucun utilisateur n'est connecté
+      // Si aucun utilisateur n'est connecté
       setState(() {
         userName = 'User';
         photoUrl = null;
@@ -64,7 +56,7 @@ class _Screen1State extends State<Screen1> {
                 children: [
                   Row(
                     children: [
-                      // Photo de l'utilisateur (ou icône par défaut pour les locaux)
+                      // Photo de l'utilisateur (ou icône par défaut si aucune photo)
                       CircleAvatar(
                         radius: 24,
                         backgroundImage: photoUrl != null
@@ -78,11 +70,9 @@ class _Screen1State extends State<Screen1> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            accountType == 'Google'
-                                ? "Welcome back,"
-                                : "Welcome back,",
-                            style: const TextStyle(
+                          const Text(
+                            "Welcome back,",
+                            style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey,
                             ),
@@ -105,6 +95,7 @@ class _Screen1State extends State<Screen1> {
                 ],
               ),
             ),
+            SizedBox(height: 30),
             SizedBox(
               height: 40,
               child: ButtonsTabBar(
@@ -141,13 +132,13 @@ class _Screen1State extends State<Screen1> {
                 ],
               ),
             ),
-            const SizedBox(
-              height: 500,
+            // Utiliser un Expanded pour que TabBarView occupe l'espace restant
+            const Expanded(
               child: TabBarView(
                 children: [
-                  Center(child: Text('Transfer')),
-                  Center(child: Text('Matches')),
-                  Center(child: Text('Leagues')),
+                  You(),
+                  Center(child: Text('Most popular')),
+                  Center(child: Text('+ Create')),
                 ],
               ),
             ),

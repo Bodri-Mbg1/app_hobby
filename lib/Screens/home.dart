@@ -1,5 +1,6 @@
 import 'dart:math'; // Import pour générer des couleurs aléatoires
 import 'package:app_hobby/Screens/screen1.dart';
+import 'package:app_hobby/custom_nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -157,8 +158,10 @@ class _HomeState extends State<Home> {
               child: GestureDetector(
                 onTap: () async {
                   await _saveHobbiesToFirebase();
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (context) => const Screen1()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const CustomNavBar()));
                 },
                 child: Container(
                   height: 70,
