@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class ScreenSearch extends StatefulWidget {
@@ -12,9 +13,11 @@ class ScreenSearch extends StatefulWidget {
 class _ScreenSearchState extends State<ScreenSearch> {
   late GoogleMapController mapController;
 
+  // ignore: unused_field
   final LatLng _initialPosition =
       const LatLng(37.7749, -122.4194); // San Francisco
 
+  // ignore: unused_element
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
   }
@@ -94,10 +97,11 @@ class _ScreenSearchState extends State<ScreenSearch> {
                   try {
                     mapController = controller;
                   } catch (e) {
+                    // ignore: avoid_print
                     print("Erreur lors de la création de la carte : $e");
                   }
                 },
-                initialCameraPosition: CameraPosition(
+                initialCameraPosition: const CameraPosition(
                   target: LatLng(37.7749, -122.4194),
                   zoom: 10.0,
                 ),

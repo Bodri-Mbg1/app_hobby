@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,192 +12,302 @@ class TabForyou extends StatefulWidget {
 }
 
 class _TabForyouState extends State<TabForyou> {
-  List<Map<String, dynamic>> categories = [];
-  List<String> selectedHobbies = [];
+  List<Map<String, dynamic>> communities = [];
+  List<Map<String, dynamic>> posts = [];
 
   @override
   void initState() {
     super.initState();
-    _loadUserHobbies();
+    _loadEntities();
   }
 
-  // Récupérer les hobbies sélectionnés par l'utilisateur depuis Firebase
-  Future<void> _loadUserHobbies() async {
+  // Récupérer les communautés et les posts depuis Firestore
+  Future<void> _loadEntities() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (doc.exists) {
-          setState(() {
-            selectedHobbies = List<String>.from(doc.data()?['hobbies'] ?? []);
-          });
-
-          // Charger les catégories pour les hobbies sélectionnés
-          await _loadCategoriesForSelectedHobbies();
-        }
+      if (user == null) {
+        throw Exception('User not logged in.');
       }
-    } catch (e) {
-      print("Erreur lors du chargement des hobbies : $e");
-    }
-  }
 
-  // Récupérer les catégories uniquement pour les hobbies sélectionnés
-  Future<void> _loadCategoriesForSelectedHobbies() async {
-    final data = await fetchCategoriesForSelectedHobbies(selectedHobbies);
-    setState(() {
-      categories = data;
-    });
-  }
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
-  // Récupérer les catégories des hobbies sélectionnés
-  Future<List<Map<String, dynamic>>> fetchCategoriesForSelectedHobbies(
-      List<String> hobbies) async {
-    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final List<String> hobbies =
+          List<String>.from(userDoc.data()?['hobbies'] ?? []);
 
-    try {
-      List<Map<String, dynamic>> allCategories = [];
+      if (hobbies.isEmpty) {
+        setState(() {
+          communities = [];
+          posts = [];
+        });
+        return;
+      }
 
-      for (var hobby in hobbies) {
-        // Récupérer les catégories pour chaque hobby sélectionné
-        final QuerySnapshot categoriesSnapshot = await firestore
+      List<Map<String, dynamic>> loadedCommunities = [];
+      List<Map<String, dynamic>> loadedPosts = [];
+
+      for (String hobby in hobbies) {
+        // Charger les communautés
+        final communitySnapshot = await FirebaseFirestore.instance
             .collection('hobbies')
             .doc(hobby)
-            .collection('categories')
+            .collection('communities')
             .get();
 
-        // Ajouter les catégories à la liste finale
-        final categories = categoriesSnapshot.docs
-            .map((catDoc) => catDoc.data() as Map<String, dynamic>)
-            .toList();
-        allCategories.addAll(categories);
+        loadedCommunities.addAll(communitySnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'title': data['title'] ?? 'Untitled',
+            'description': data['description'] ?? '',
+            'imageUrl': data['imageUrl'] ?? '',
+            'hashtags': List<String>.from(data['hashtags'] ?? []),
+          };
+        }).toList());
+
+        // Charger les posts
+        final postSnapshot = await FirebaseFirestore.instance
+            .collection('hobbies')
+            .doc(hobby)
+            .collection('posts')
+            .get();
+
+        loadedPosts.addAll(postSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'title': data['title'] ?? 'Untitled',
+            'description': data['description'] ?? '',
+            'imageUrl': data['imageUrl'] ?? '',
+            'hashtags': List<String>.from(data['hashtags'] ?? []),
+          };
+        }).toList());
       }
 
-      return allCategories;
+      setState(() {
+        communities = loadedCommunities;
+        posts = loadedPosts;
+      });
     } catch (e) {
-      print("Erreur lors de la récupération des catégories : $e");
-      return [];
+      print('Error loading entities: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: categories.isEmpty
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-
-                return Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Container(
-                    width: 200,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.white,
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12)),
-                          child: Image.network(
-                            category['imageUrl'] ?? '',
-                            height: 120,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Titre
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(
-                            category['title'] ?? "Sans titre",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-
-                        // Hashtags
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Wrap(
-                            spacing: 4,
-                            children: (category['hashtags'] as List<dynamic>?)
-                                    ?.map((hashtag) => Text(
-                                          hashtag,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ))
-                                    .toList() ??
-                                [],
-                          ),
-                        ),
-
-                        // Badge d'indicateur
-                        const Spacer(),
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8.0, bottom: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.8),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: const [
-                                    Icon(
-                                      Icons.people,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      "24", // Exemple statique
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Titre pour les communautés
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text(
+                'Communities',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            // Liste horizontale pour les communautés
+            communities.isEmpty
+                ? const Center(
+                    child: Text('No communities found.',
+                        style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  )
+                : SizedBox(
+                    height: 240,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: communities.length,
+                      itemBuilder: (context, index) {
+                        final community = communities[index];
+                        return _buildCommunityCard(community);
+                      },
                     ),
                   ),
-                );
-              },
+            const SizedBox(height: 20),
+
+            // Titre pour les posts
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text(
+                'Posts',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
             ),
+            // Liste horizontale pour les posts
+            posts.isEmpty
+                ? const Center(
+                    child: Text('No posts found.',
+                        style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  )
+                : SizedBox(
+                    height: 240,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        final post = posts[index];
+                        return _buildPostCard(post);
+                      },
+                    ),
+                  ),
+          ],
+        ),
+      ),
     );
+  }
+
+  // Widget pour afficher une carte de communauté
+  Widget _buildCommunityCard(Map<String, dynamic> community) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Container(
+        height: 240,
+        width: 270,
+        decoration: BoxDecoration(
+          color: const Color(0xfffafafa),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: community['imageUrl'].startsWith('data:image/')
+                        ? Image.memory(
+                            _decodeBase64Image(community['imageUrl']),
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            community['imageUrl'],
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 140,
+                                color: Colors.grey,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                community['title'],
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Wrap(
+                spacing: 4,
+                children: community['hashtags']
+                    .map<Widget>((hashtag) => Text(
+                          '#$hashtag',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Widget pour afficher une carte de post
+  Widget _buildPostCard(Map<String, dynamic> post) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Container(
+        height: 180,
+        width: 140,
+        decoration: BoxDecoration(
+          color: const Color(0xfffafafa),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: post['imageUrl'].startsWith('data:image/')
+                    ? Image.memory(
+                        _decodeBase64Image(post['imageUrl']),
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        post['imageUrl'],
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 120,
+                            color: Colors.grey,
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                post['title'],
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Wrap(
+                spacing: 4,
+                children: post['hashtags']
+                    .map<Widget>((hashtag) => Text(
+                          '#$hashtag',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Uint8List _decodeBase64Image(String base64String) {
+    final String base64Data = base64String.split(',')[1];
+    return base64Decode(base64Data);
   }
 }

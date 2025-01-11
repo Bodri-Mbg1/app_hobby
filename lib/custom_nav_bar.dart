@@ -20,10 +20,10 @@ class _CustomNavBarState extends State<CustomNavBar> {
   ];
 
   final List<Widget> pages = [
-    Screen1(), // Page pour Home
-    Center(child: Text('Add Page', style: TextStyle(fontSize: 24))),
-    ScreenSearch(),
-    Center(child: Text('Send Page', style: TextStyle(fontSize: 24))),
+    const Screen1(), // Page pour Home
+    const Center(child: Text('Add Page', style: TextStyle(fontSize: 24))),
+    const ScreenSearch(),
+    const Center(child: Text('Send Page', style: TextStyle(fontSize: 24))),
   ];
 
   @override
@@ -47,11 +47,11 @@ class _CustomNavBarState extends State<CustomNavBar> {
                 // Conteneur actif
                 Container(
                   width: MediaQuery.of(context).size.width * 0.3,
-                  height: 60,
+                  height: 55,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.black,
+                    color: const Color(0xff1c1d21),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -80,16 +80,17 @@ class _CustomNavBarState extends State<CustomNavBar> {
                 // Icônes restantes
                 Container(
                   width: MediaQuery.of(context).size.width * 0.5,
-                  height: 60,
+                  height: 55,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.all(Radius.circular(20)),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(navItems.length, (index) {
-                      if (index == selectedIndex)
+                      if (index == selectedIndex) {
                         return const SizedBox.shrink();
+                      }
 
                       return GestureDetector(
                         onTap: () {

@@ -51,6 +51,9 @@ dependencies:
   flutter_polyline_points: ^2.1.0
   google_maps_flutter: ^2.10.0
   smooth_page_indicator: ^1.2.0+3
+  http: ^1.2.2
+  geolocator: ^13.0.2
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

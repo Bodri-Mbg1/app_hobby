@@ -1,7 +1,8 @@
 import 'package:app_hobby/Screens/home.dart';
-import 'package:app_hobby/create_user.dart';
+import 'package:app_hobby/custom_nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,40 +17,82 @@ class _WelcomeState extends State<Welcome> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  Future<void> _login() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    final GoogleSignIn googleSignIn = GoogleSignIn();
 
-    if (username.isEmpty || password.isEmpty) {
+    try {
+      // Déconnecter l'utilisateur existant pour forcer le choix du compte
+      await googleSignIn.signOut();
+
+      // Lancer la connexion
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser != null) {
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        final UserCredential userCredential =
+            await FirebaseAuth.instance.signInWithCredential(credential);
+        final User? user = userCredential.user;
+
+        if (user != null) {
+          // Vérifiez si l'utilisateur a déjà sélectionné des hobbies
+          bool hasHobbies = await _checkUserHobbies(user.uid);
+
+          if (hasHobbies) {
+            // Redirigez vers la page principale
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const CustomNavBar()),
+            );
+          } else {
+            // Redirigez vers la page de sélection des hobbies
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const Home()),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("User information not available.")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Sign-in cancelled by user.")),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields.")),
+        SnackBar(content: Text("Error: $e")),
       );
-      return;
     }
+  }
 
-    // Récupérer les informations stockées localement
-    final prefs = await SharedPreferences.getInstance();
-    final savedUsername = prefs.getString('username');
-    final savedPassword = prefs.getString('password');
+  Future<bool> _checkUserHobbies(String userId) async {
+    try {
+      final DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
 
-    // Vérification des informations
-    if (username == savedUsername && password == savedPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login successful!")),
-      );
+      if (userDoc.exists && userDoc.data() != null) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        final hobbies = data['hobbies'] as List<dynamic>?;
 
-      // Enregistrer l'utilisateur connecté
-      await prefs.setString('loggedInUser', username);
-
-      // Redirection vers la page principale
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const Home()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid username or password.")),
-      );
+        if (hobbies != null && hobbies.isNotEmpty) {
+          return true; // L'utilisateur a des hobbies
+        }
+      }
+      return false; // Pas de hobbies
+    } catch (e) {
+      print("Erreur lors de la vérification des hobbies : $e");
+      return false;
     }
   }
 
@@ -138,47 +181,5 @@ class _WelcomeState extends State<Welcome> {
         ],
       ),
     );
-  }
-
-  Future<void> _signInWithGoogle(BuildContext context) async {
-    final GoogleSignIn googleSignIn = GoogleSignIn();
-
-    try {
-      // Déconnecter l'utilisateur existant pour forcer le choix du compte
-      await googleSignIn.signOut();
-
-      // Lancer la connexion
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-      if (googleUser != null) {
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
-
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        await FirebaseAuth.instance.signInWithCredential(credential);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Bienvenue ${googleUser.displayName}")),
-        );
-
-        // Redirection vers la page principale
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const Home()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Sign-in cancelled by user.")),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
-    }
   }
 }

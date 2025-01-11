@@ -41,6 +41,7 @@ class _CreateUserState extends State<CreateUser> {
         await prefs.setString('email', email);
         await prefs.setString('password', password);
 
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("User saved successfully!")),
         );
@@ -51,6 +52,7 @@ class _CreateUserState extends State<CreateUser> {
         _passwordController.clear();
       }
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: ${e.toString()}")),
       );

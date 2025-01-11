@@ -1,5 +1,4 @@
 import 'dart:math'; // Import pour générer des couleurs aléatoires
-import 'package:app_hobby/Screens/screen1.dart';
 import 'package:app_hobby/custom_nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,7 +12,6 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  // Liste des hobbies avec leurs icônes
   final List<Map<String, dynamic>> hobbies = [
     {'name': 'Cars', 'icon': Icons.directions_car},
     {'name': 'Music', 'icon': Icons.music_note},
@@ -33,14 +31,52 @@ class _HomeState extends State<Home> {
   final Map<String, Color> selectedColors =
       {}; // Couleurs aléatoires pour chaque sélection
 
+  @override
+  void initState() {
+    super.initState();
+    _checkAndRedirect(); // Vérifiez et redirigez si nécessaire
+  }
+
+  // Vérifier et rediriger si des hobbies existent déjà
+  Future<void> _checkAndRedirect() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final hobbiesFromDB = List<String>.from(doc.data()?['hobbies'] ?? []);
+
+        if (hobbiesFromDB.isNotEmpty) {
+          // Rediriger directement vers la page suivante
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const CustomNavBar()),
+          );
+        } else {
+          // Charger les hobbies si l'utilisateur n'a pas encore sélectionné
+          setState(() {
+            selectedHobbies.addAll(hobbiesFromDB);
+            for (var hobby in hobbiesFromDB) {
+              selectedColors[hobby] = _generateRandomColor();
+            }
+          });
+        }
+      }
+    }
+  }
+
   // Générer une couleur aléatoire
   Color _generateRandomColor() {
     final Random random = Random();
     return Color.fromARGB(
-      255, // Opacité maximale (0-255)
-      random.nextInt(156) + 100, // Rouge (100-255)
-      random.nextInt(156) + 100, // Vert (100-255)
-      random.nextInt(156) + 100, // Bleu (100-255)
+      255,
+      random.nextInt(156) + 100,
+      random.nextInt(156) + 100,
+      random.nextInt(156) + 100,
     ).withOpacity(0.8); // Couleur vive
   }
 
@@ -55,6 +91,12 @@ class _HomeState extends State<Home> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Hobbies saved successfully!")),
+        );
+
+        // Rediriger vers la page suivante après la sauvegarde
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CustomNavBar()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,7 +131,7 @@ class _HomeState extends State<Home> {
             Expanded(
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, // 3 colonnes
+                  crossAxisCount: 3,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
                   childAspectRatio: 1,
@@ -103,11 +145,9 @@ class _HomeState extends State<Home> {
                     onTap: () {
                       setState(() {
                         if (isSelected) {
-                          // Si déjà sélectionné, retirer de la liste
                           selectedHobbies.remove(hobby['name']);
                           selectedColors.remove(hobby['name']);
                         } else {
-                          // Sinon, ajouter et générer une couleur aléatoire
                           selectedHobbies.add(hobby['name']);
                           selectedColors[hobby['name']] =
                               _generateRandomColor();
@@ -117,12 +157,10 @@ class _HomeState extends State<Home> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? selectedColors[hobby[
-                                'name']] // Couleur aléatoire pour les sélections
-                            : Colors.grey[
-                                200], // Couleur uniforme pour les non-sélections
+                            ? selectedColors[hobby['name']]
+                            : Colors.grey[200],
                         borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
                             color: Colors.black12,
                             blurRadius: 5,
@@ -138,12 +176,13 @@ class _HomeState extends State<Home> {
                             size: 30,
                             color: Colors.black,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 15),
                           Text(
                             hobby['name'],
                             style: const TextStyle(
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w900,
                               color: Colors.black,
+                              fontSize: 18,
                             ),
                           ),
                         ],
@@ -156,19 +195,14 @@ class _HomeState extends State<Home> {
             const SizedBox(height: 20),
             Center(
               child: GestureDetector(
-                onTap: () async {
-                  await _saveHobbiesToFirebase();
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const CustomNavBar()));
-                },
+                onTap: _saveHobbiesToFirebase,
                 child: Container(
                   height: 70,
                   width: 150,
                   decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(15)),
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.only(left: 20, right: 5),
                     child: Row(
@@ -176,19 +210,21 @@ class _HomeState extends State<Home> {
                         const Text(
                           "Start",
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold),
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const Spacer(),
                         Container(
                           height: 60,
                           width: 60,
                           decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: Colors.white),
+                            borderRadius: BorderRadius.circular(10),
+                            color: Colors.white,
+                          ),
                           child: const Icon(Icons.arrow_forward_rounded),
-                        )
+                        ),
                       ],
                     ),
                   ),
