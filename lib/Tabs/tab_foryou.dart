@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:app_hobby/Screens/CommunityDetailsPage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -56,13 +57,41 @@ class _TabForyouState extends State<TabForyou> {
             .collection('communities')
             .get();
 
+        for (var doc in communitySnapshot.docs) {
+          final data = doc.data();
+
+          // Compter les membres de chaque communauté
+          final membersSnapshot = await FirebaseFirestore.instance
+              .collection('hobbies')
+              .doc(hobby)
+              .collection('communities')
+              .doc(doc.id)
+              .collection('members')
+              .get();
+
+          loadedCommunities.add({
+            ...data,
+            'id': doc.id,
+            'hobbyId': hobby,
+            'memberCount': membersSnapshot.size, // Nombre de membres
+          });
+        }
+      }
+
+      for (String hobby in hobbies) {
+        // Charger les communautés
+        final communitySnapshot = await FirebaseFirestore.instance
+            .collection('hobbies')
+            .doc(hobby)
+            .collection('communities')
+            .get();
+
         loadedCommunities.addAll(communitySnapshot.docs.map((doc) {
           final data = doc.data();
           return {
-            'title': data['title'] ?? 'Untitled',
-            'description': data['description'] ?? '',
-            'imageUrl': data['imageUrl'] ?? '',
-            'hashtags': List<String>.from(data['hashtags'] ?? []),
+            ...data,
+            'id': doc.id, // Ajouter l'ID du document
+            'hobbyId': hobby, // ID du hobby associé
           };
         }).toList());
 
@@ -76,10 +105,9 @@ class _TabForyouState extends State<TabForyou> {
         loadedPosts.addAll(postSnapshot.docs.map((doc) {
           final data = doc.data();
           return {
-            'title': data['title'] ?? 'Untitled',
-            'description': data['description'] ?? '',
-            'imageUrl': data['imageUrl'] ?? '',
-            'hashtags': List<String>.from(data['hashtags'] ?? []),
+            ...data,
+            'id': doc.id, // Ajouter l'ID du document
+            'hobbyId': hobby, // ID du hobby associé
           };
         }).toList());
       }
@@ -90,6 +118,52 @@ class _TabForyouState extends State<TabForyou> {
       });
     } catch (e) {
       print('Error loading entities: $e');
+    }
+  }
+
+  Future<void> _deleteCommunity(Map<String, dynamic> community) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('hobbies')
+          .doc(community[
+              'hobbyId']) // Remplacez par la logique pour obtenir l'ID du hobby
+          .collection('communities')
+          .doc(community['id']) // Assurez-vous d'avoir stocké l'ID du document
+          .delete();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Community deleted successfully!')),
+      );
+
+      _loadEntities(); // Rechargez les communautés après suppression
+    } catch (e) {
+      print('Error deleting community: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error deleting community.')),
+      );
+    }
+  }
+
+  Future<void> _deletePost(Map<String, dynamic> post) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('hobbies')
+          .doc(post[
+              'hobbyId']) // Remplacez par la logique pour obtenir l'ID du hobby
+          .collection('posts')
+          .doc(post['id']) // Assurez-vous d'avoir stocké l'ID du document
+          .delete();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post deleted successfully!')),
+      );
+
+      _loadEntities(); // Rechargez les posts après suppression
+    } catch (e) {
+      print('Error deleting post: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error deleting post.')),
+      );
     }
   }
 
@@ -111,7 +185,7 @@ class _TabForyouState extends State<TabForyou> {
             // Liste horizontale pour les communautés
             communities.isEmpty
                 ? const Center(
-                    child: Text('No communities found.',
+                    child: Text('Wait for communities...',
                         style: TextStyle(fontSize: 16, color: Colors.grey)),
                   )
                 : SizedBox(
@@ -138,7 +212,7 @@ class _TabForyouState extends State<TabForyou> {
             // Liste horizontale pour les posts
             posts.isEmpty
                 ? const Center(
-                    child: Text('No posts found.',
+                    child: Text('Wait for posts...',
                         style: TextStyle(fontSize: 16, color: Colors.grey)),
                   )
                 : SizedBox(
@@ -160,81 +234,132 @@ class _TabForyouState extends State<TabForyou> {
 
   // Widget pour afficher une carte de communauté
   Widget _buildCommunityCard(Map<String, dynamic> community) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Container(
-        height: 240,
-        width: 270,
-        decoration: BoxDecoration(
-          color: const Color(0xfffafafa),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
-                    child: community['imageUrl'].startsWith('data:image/')
-                        ? Image.memory(
-                            _decodeBase64Image(community['imageUrl']),
-                            height: 140,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.network(
-                            community['imageUrl'],
-                            height: 140,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 140,
-                                color: Colors.grey,
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.broken_image,
-                                    color: Colors.white,
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    return GestureDetector(
+      onTap: () {
+        // Naviguer vers la page de détails de la communauté
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CommunityDetailsPage(
+              community: community,
+              hobbyId: community['hobbyId'],
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          height: 240,
+          width: 270,
+          decoration: BoxDecoration(
+            color: const Color(0xfffafafa),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(25),
+                      child: community['imageUrl'].startsWith('data:image/')
+                          ? Image.memory(
+                              _decodeBase64Image(community['imageUrl']),
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.network(
+                              community['imageUrl'],
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 140,
+                                  color: Colors.grey,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                community['title'],
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                                );
+                              },
+                            ),
+                    ),
+                    // Afficher le nombre de membres
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.person, color: Colors.white, size: 12),
+                            Text(
+                              '${community['memberCount'] ?? 0}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (community['creatorId'] == currentUser?.uid)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _deleteCommunity(community),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              Wrap(
-                spacing: 4,
-                children: community['hashtags']
-                    .map<Widget>((hashtag) => Text(
-                          '#$hashtag',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ))
-                    .toList(),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  community['title'],
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Wrap(
+                  spacing: 4,
+                  children: community['hashtags']
+                      .map<Widget>((hashtag) => Text(
+                            '#$hashtag',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Widget pour afficher une carte de post
   Widget _buildPostCard(Map<String, dynamic> post) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Container(
@@ -249,33 +374,47 @@ class _TabForyouState extends State<TabForyou> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: post['imageUrl'].startsWith('data:image/')
-                    ? Image.memory(
-                        _decodeBase64Image(post['imageUrl']),
-                        height: 120,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : Image.network(
-                        post['imageUrl'],
-                        height: 120,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: post['imageUrl'].startsWith('data:image/')
+                        ? Image.memory(
+                            _decodeBase64Image(post['imageUrl']),
                             height: 120,
-                            color: Colors.grey,
-                            child: const Center(
-                              child: Icon(
-                                Icons.broken_image,
-                                color: Colors.white,
-                              ),
-                            ),
-                          );
-                        },
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            post['imageUrl'],
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 120,
+                                color: Colors.grey,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  if (post['creatorId'] ==
+                      currentUser?.uid) // Vérifie si c'est le créateur
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deletePost(post),
                       ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(

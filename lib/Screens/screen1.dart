@@ -155,13 +155,13 @@ class CreateOptionsTab extends StatelessWidget {
         padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
-            Text(
+            const Text(
               "Crée ta communauté\nou ton poste",
               style: TextStyle(
                   fontSize: 35, fontWeight: FontWeight.w900, height: 1),
             ),
             const SizedBox(height: 20),
-            Text(
+            const Text(
                 'Partage tes interets avec les autres utilisateurs, ou crée ton propre groupe de discussion'),
             const SizedBox(height: 10),
             Container(
@@ -211,7 +211,7 @@ class CreateOptionsTab extends StatelessWidget {
                                   color: const Color(0xFF039227),
                                   borderRadius: BorderRadius.circular(15),
                                 ),
-                                child: Center(
+                                child: const Center(
                                   child: Text(
                                     'Create Community',
                                     style: TextStyle(
@@ -275,7 +275,7 @@ class CreateOptionsTab extends StatelessWidget {
                                   color: const Color(0xFF039227),
                                   borderRadius: BorderRadius.circular(15),
                                 ),
-                                child: Center(
+                                child: const Center(
                                   child: Text(
                                     'Create Post',
                                     style: TextStyle(
@@ -398,7 +398,8 @@ class _CreateEntityTabState extends State<CreateEntityTab> {
         selectedHobby == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please fill all fields and select a hobby.')),
+          content: Text('Please fill all fields and select a hobby.'),
+        ),
       );
       return;
     }
@@ -410,6 +411,9 @@ class _CreateEntityTabState extends State<CreateEntityTab> {
       // Déterminer la collection cible : "communities" ou "posts"
       final collection = widget.type == 'community' ? 'communities' : 'posts';
 
+      // Obtenir les informations de l'utilisateur
+      final currentUser = FirebaseAuth.instance.currentUser;
+
       // Préparer les données
       final data = {
         'title': _titleController.text.trim(),
@@ -418,6 +422,8 @@ class _CreateEntityTabState extends State<CreateEntityTab> {
             _hashtagsController.text.split(',').map((e) => e.trim()).toList(),
         'imageUrl': imageUrl,
         'createdAt': FieldValue.serverTimestamp(),
+        'creatorId': currentUser?.uid, // ID du créateur
+        'creatorName': currentUser?.displayName ?? 'Unknown', // Nom du créateur
       };
 
       // Ajouter les données à la sous-collection appropriée
@@ -429,8 +435,10 @@ class _CreateEntityTabState extends State<CreateEntityTab> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                '${widget.type == 'community' ? 'Community' : 'Post'} created successfully!')),
+          content: Text(
+            '${widget.type == 'community' ? 'Community' : 'Post'} created successfully!',
+          ),
+        ),
       );
 
       _clearFields();
@@ -510,13 +518,45 @@ class _CreateEntityTabState extends State<CreateEntityTab> {
                   labelText: 'Hashtags (comma-separated)'),
             ),
             const SizedBox(height: 10),
-            imageUrl != null
-                ? Image.network(imageUrl!)
-                : ElevatedButton.icon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.image),
-                    label: const Text('Upload Image'),
-                  ),
+            Container(
+              width: double.infinity,
+              height: 200,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.grey, width: 1),
+                image: imageUrl != null
+                    ? DecorationImage(
+                        image:
+                            MemoryImage(base64Decode(imageUrl!.split(',')[1])),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: imageUrl == null
+                  ? Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _pickImage,
+                        icon: const Icon(Icons.image),
+                        label: const Text('Upload Image'),
+                      ),
+                    )
+                  : Stack(
+                      children: [
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              setState(() {
+                                imageUrl = null;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,

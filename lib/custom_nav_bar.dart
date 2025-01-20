@@ -1,3 +1,4 @@
+import 'package:app_hobby/Screens/EditHobbiesPage.dart';
 import 'package:app_hobby/Screens/Screen_search.dart';
 import 'package:flutter/material.dart';
 import 'package:app_hobby/Screens/screen1.dart';
@@ -21,7 +22,7 @@ class _CustomNavBarState extends State<CustomNavBar> {
 
   final List<Widget> pages = [
     const Screen1(), // Page pour Home
-    const Center(child: Text('Add Page', style: TextStyle(fontSize: 24))),
+    const EditHobbiesPage(),
     const ScreenSearch(),
     const Center(child: Text('Send Page', style: TextStyle(fontSize: 24))),
   ];

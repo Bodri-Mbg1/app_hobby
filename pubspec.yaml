@@ -54,6 +54,7 @@ dependencies:
   http: ^1.2.2
   geolocator: ^13.0.2
   image_picker: ^1.1.2
+  timeago: ^3.2.2
 
 dev_dependencies:
   flutter_test:
